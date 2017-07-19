@@ -11,27 +11,17 @@ from six.moves import cPickle
 
 from odin import fuel as F, visual as V
 from odin.utils import get_all_files
+from const import inpath, outpath
+
 
 # ===========================================================================
 # Const
 # ===========================================================================
-inpath = [
-    "/mnt/sdb1/digisami_data/estonian",
-    "/mnt/sdb1/digisami_data/finnish",
-    "/mnt/sdb1/digisami_data/sami_conv"
-]
-
-outpath = [
-    "/home/trung/data/estonian",
-    "/home/trung/data/finnish",
-    "/home/trung/data/sami_conv"
-]
-
-
 def array2D(x):
     if x.ndim == 1:
         x = x[None, :]
     return x
+
 # ===========================================================================
 # Processing
 # ===========================================================================

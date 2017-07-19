@@ -1,5 +1,5 @@
 # Fdb version 3
-["bibtex DigiSami-IEEE-TAC-v07"] 1499343070 "DigiSami-IEEE-TAC-v07.aux" "DigiSami-IEEE-TAC-v07.bbl" "DigiSami-IEEE-TAC-v07" 1500386288
+["bibtex DigiSami-IEEE-TAC-v07"] 1499343070 "DigiSami-IEEE-TAC-v07.aux" "DigiSami-IEEE-TAC-v07.bbl" "DigiSami-IEEE-TAC-v07" 1500391708
   "../digisami.bib" 0 -1 0 ""
   "/usr/local/texlive/2015/texmf-dist/bibtex/bst/IEEEtran/IEEEtran.bst" 1222816716 59506 016987d9be15acf51cdd7252d40ecec2 ""
   "DigiSami-IEEE-TAC-v07.aux" 1499343074 12506 d240994b52f32831730f116907d30a20 ""
@@ -7,7 +7,7 @@
   (generated)
   "DigiSami-IEEE-TAC-v07.bbl"
   "DigiSami-IEEE-TAC-v07.blg"
-["pdflatex"] 1499343070 "DigiSami-IEEE-TAC-v07.tex" "DigiSami-IEEE-TAC-v07.pdf" "DigiSami-IEEE-TAC-v07" 1500386288
+["pdflatex"] 1499343070 "DigiSami-IEEE-TAC-v07.tex" "DigiSami-IEEE-TAC-v07.pdf" "DigiSami-IEEE-TAC-v07" 1500391708
   "./figures/all/duration_boxplot_all.pdf" 1470049748 17977 caf571be20c6d69ed6926d4c58c37156 ""
   "./figures/all/duration_boxplot_emotion.pdf" 1470049748 16770 cc1e17d4d883c92c51116707d238e24a ""
   "./figures/all/duration_boxplot_laugh.pdf" 1470049748 16105 23c72e1720cb4232f4712cf7614cd825 ""
@@ -144,7 +144,7 @@
   "/usr/local/texlive/2015/texmf.cnf" 1432479636 577 0d611272082f3cdb8e80e09a3c69cf07 ""
   "DigiSami-IEEE-TAC-v07.aux" 1499343074 12506 d240994b52f32831730f116907d30a20 ""
   "DigiSami-IEEE-TAC-v07.bbl" 1470073766 5992 dd4cc8053567a84efc475a551fa38765 "bibtex DigiSami-IEEE-TAC-v07"
-  "DigiSami-IEEE-TAC-v07.tex" 1500386287 76740 9fa44f01f94c2284cd3d1923df25d92e ""
+  "DigiSami-IEEE-TAC-v07.tex" 1500391708 76740 9fa44f01f94c2284cd3d1923df25d92e ""
   "IEEEtran.cls" 1440650876 288304 b67b6fc6c2abb39f9b461923f5199343 ""
   "figures/all/duration_boxplot_all.pdf" 1470049748 17977 caf571be20c6d69ed6926d4c58c37156 ""
   "figures/all/duration_boxplot_emotion.pdf" 1470049748 16770 cc1e17d4d883c92c51116707d238e24a ""
@@ -178,6 +178,6 @@
   "images/boundingbox.png" 1493111792 162780 02f441452d3ae57ebc9cbaff96f5dff5 ""
   (generated)
   "DigiSami-IEEE-TAC-v07.aux"
+  "DigiSami-IEEE-TAC-v07.pdf"
   "sections/3_copora_desc.tex.aux"
   "DigiSami-IEEE-TAC-v07.log"
-  "DigiSami-IEEE-TAC-v07.pdf"
