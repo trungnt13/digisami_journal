@@ -125,6 +125,8 @@ class LaughTrans(F.recipes.FeederRecipe):
             X = [np.empty(shape=(1,) + tuple(s[1:]))
                  for s in shapes]
             X = self.merge_features(X)
+            if not isinstance(X, (tuple, list)):
+                X = (X,)
             n = shapes[0][0]
             shapes = [(n,) + x.shape[1:] for x in X]
         return shapes, indices
@@ -185,8 +187,7 @@ def get_dataset(dsname,
                 context=100, hop=None, seq=True,
                 unite_topics=False,
                 nb_topics=6,
-                ncpu=4,
-                seed=12082518):
+                ncpu=4, seed=12082518):
     """
     dsname: str (estonian, finnish, sami_conv)
     features: list of str
@@ -223,9 +224,9 @@ def get_dataset(dsname,
     train = F.Feeder(data, indices=train, dtype='float32',
                      ncpu=ncpu, buffer_size=6)
     valid = F.Feeder(data, indices=valid, dtype='float32',
-                     ncpu=ncpu, buffer_size=2)
+                     ncpu=ncpu, buffer_size=1)
     test = F.Feeder(data, indices=test, dtype='float32',
-                    ncpu=ncpu, buffer_size=2)
+                    ncpu=2, buffer_size=1)
     # ====== recipes ====== #
     recipes = [
         [F.recipes.Normalization(mean=ds[i + '_mean'], std=ds[i + '_std'],
@@ -247,7 +248,7 @@ def get_dataset(dsname,
     ]
     train.set_recipes(recipes + [F.recipes.CreateBatch()])
     valid.set_recipes(recipes + [F.recipes.CreateBatch()])
-    test.set_recipes(recipes + [F.recipes.CreateFile()]
-        ).set_batch(batch_size=1, seed=None)
+    test.set_recipes(recipes + [F.recipes.CreateFile(return_name=True)]
+        ).set_batch(batch_size=256, seed=None)
     # ====== estimate nb_classes ====== #
     return train, valid, test, _nb_classes(mode, gender, dsname)
