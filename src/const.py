@@ -10,17 +10,15 @@ from odin.utils import struct
 # ===========================================================================
 # Const
 # ===========================================================================
+CUT_DURATION = 10
+
 inpath = [
     "/mnt/sdb1/digisami_data/estonian",
     "/mnt/sdb1/digisami_data/finnish",
     "/mnt/sdb1/digisami_data/sami_conv"
 ]
 
-outpath = [
-    "/home/trung/data/estonian",
-    "/home/trung/data/finnish",
-    "/home/trung/data/sami_conv"
-]
+outpath = "/home/trung/data/sami_feat"
 
 ######
 mspec_pitch_topic = {
