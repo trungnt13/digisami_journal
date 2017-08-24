@@ -41,8 +41,10 @@ def get_partitions(f):
 segments = []
 laugh = {}
 topic = {}
+gender = {} # lang -> {spkID -> F or M}
 for path in inpath:
-    lang = 'est' if 'estonian' in path else ('fin' if 'finnish' in path else 'sam')
+    lang = 'est' if 'estonian' in path else ('fin' if 'finnish' in path else
+                                             'sam')
     print("Input path:", path)
     audio_path = os.path.join(path, 'audio')
     segments += [
@@ -64,9 +66,20 @@ for path in inpath:
             dtype='str', delimiter=':', skip_header=3)]
         for f in get_all_files(os.path.join(path, 'topic_csv'))}
     )
+    # ====== update speaker gender ====== #
+    if lang in ('est', 'fin'):
+        gender[lang] = {spkID: spkID[-1]
+                        for name, anno in laugh.iteritems()
+                        for spkID, _, _, _ in anno
+                        if lang + '/' in name}
+    else:
+        sami_gender = np.genfromtxt(os.path.join(path, 'gender.csv'),
+                                    dtype=str, delimiter=' ', skip_header=1)
+        gender['sam'] = {spkID: gen for spkID, gen in sami_gender}
 print("Audio: %d (files)" % len(segments))
 print("Laugh: %d (files)" % len(laugh))
 print("Topic: %d (files)" % len(topic))
+print("Gender: %d (spk)" % sum(len(i) for i in gender.values()))
 
 
 # ===========================================================================
@@ -75,8 +88,9 @@ print("Topic: %d (files)" % len(topic))
 if os.path.exists(outpath):
     shutil.rmtree(outpath)
 # ====== FEAT ====== #
-feat = F.SpeechProcessor(segments, outpath, sr=None, sr_new=16000,
-            win=0.02, hop=0.005, window='hann',
+feat = F.SpeechProcessor(segments, outpath,
+            sr=None, sr_info={}, sr_new=16000,
+            win=0.02, hop=0.01, window='hann',
             nb_melfilters=40, nb_ceps=13,
             get_spec=True, get_qspec=False, get_phase=False,
             get_pitch=True, get_f0=True,
@@ -87,9 +101,9 @@ feat = F.SpeechProcessor(segments, outpath, sr=None, sr_new=16000,
             cqt_bins=96, preemphasis=0.97,
             center=True, power=2, log=True, backend='odin',
             pca=True, pca_whiten=False,
-            audio_ext=None, maxlen=CUT_DURATION, save_raw=True,
-            save_stats=True, substitute_nan=None,
-            dtype='float16', datatype='memmap',
+            audio_ext=None, maxlen=CUT_DURATION,
+            save_raw=True, save_stats=True,
+            substitute_nan=None, dtype='float16', datatype='memmap',
             ncache=0.08, ncpu=8)
 feat.run()
 # ====== save ====== #
@@ -97,11 +111,12 @@ with open(os.path.join(outpath, 'laugh'), 'w') as f:
     cPickle.dump(laugh, f)
 with open(os.path.join(outpath, 'topic'), 'w') as f:
     cPickle.dump(topic, f)
+with open(os.path.join(outpath, 'gender'), 'w') as f:
+    cPickle.dump(gender, f)
 
 # ===========================================================================
 # Sampling and plotting
 # ===========================================================================
-from librosa.display import waveplot
 ds = F.Dataset(outpath, read_only=True)
 files = ds['indices'].items()
 np.random.shuffle(files)
