@@ -6,7 +6,7 @@ import re
 
 import numpy as np
 
-from odin.utils import cache_disk, flatten_list
+from odin.utils import cache_disk, flatten_list, ctext
 from odin import fuel as F
 
 from sklearn.decomposition import LatentDirichletAllocation
@@ -114,7 +114,8 @@ def train_topic_clusters(text, keep_stopword=True, keep_oov=True, keep_punct=Fal
         for topic_idx, tp in enumerate(lda.components_):
             topic_terms = [terms[i]
                            for i in tp.argsort()[:-nb_top_words - 1:-1]]
-            print("Topic #%d:" % topic_idx, " ".join(topic_terms))
+            print(ctext("Topic #%d:", 'yellow') % topic_idx,
+                  " ".join(topic_terms))
             samples = [original_text[i]
                 for i, y in enumerate(Y) if y == topic_idx]
             samples = np.random.choice(samples, size=min(25, len(samples)),

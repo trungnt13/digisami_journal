@@ -5,17 +5,10 @@ os.environ['ODIN'] = 'gpu,float32'
 from odin.utils import as_tuple_of_shape, ArgController, get_script_path, stdio
 args = ArgController(
 ).add('model', 'name of model'
-).add('ds', 'dataset: est, fin, sam'
-).add('feat', 'name of feature configuration, specified in const.py'
-).add('ctx', 'length of context'
-).add('hop', 'length of hop'
-).add('-mode', 'laughter detection mode: bin, tri or all', 'bin'
-).add('-seq', 'create features using stacking or sequencing', True
-).add('-utopic', 'unite_topics', True
-).add('-ntopic', 'number of topic for LDA', 6
+).add('config', 'name of config in const.py'
 ).add('-bs', 'batch size', 128
+).add('-epoch', 'nb epoch', 8
 ).parse()
-
 
 from collections import OrderedDict
 
@@ -24,14 +17,15 @@ import numpy as np
 from odin import backend as K, nnet as N, training
 
 from processing import get_dataset
-from const import *
+from const import outpath
+from config import *
 
-if args['feat'] not in globals():
+if args['config'] not in globals():
     raise ValueError("Cannot find feature configuration with name: '%s' in const.py"
-        % args['feat'])
+        % args['config'])
 
 # ====== Path management ====== #
-MODEL_NAME = get_model(args)
+MODEL_NAME = args.model + '-' + args.config
 
 LOG_PATH = os.path.join(get_script_path(), 'logs')
 if not os.path.exists(LOG_PATH):
@@ -46,29 +40,17 @@ stdio(path=LOG_PATH)
 
 print("Log path:", LOG_PATH)
 print("Model path:", MODEL_PATH)
+
 # ===========================================================================
 # Dataset
 # ===========================================================================
-if args['ds'] not in ('est', 'fin', 'sam'):
-    raise ValueError('Support dataset: est, fin, sam but given: %s' % args['ds'])
-dsname = 'estonian' if args['ds'] == 'est' else ('finnish' if args['ds'] == 'fin'
-                                                 else 'sami_conv')
-train, valid, test, nb_classes = get_dataset(
-    dsname=dsname, gender=False, mode=str(args['mode']),
-    context=int(args['ctx']), hop=int(args['hop']), seq=bool(args['seq']),
-    unite_topics=bool(args['utopic']), nb_topics=int(args['ntopic']),
-    ncpu=6, seed=12082518, **globals()[args['feat']])
+train, valid, test, nb_classes = get_dataset(**globals()[args.config])
 X = [K.placeholder(shape=(None,) + s[1:], dtype='float32', name='input%d' % i)
      for i, s in enumerate(as_tuple_of_shape(train.shape))]
 y = K.placeholder(shape=(None, nb_classes), dtype='float32', name='laughter')
 inputs = X + [y, nb_classes]
-print("Loaded dataset:", args['ds'])
-print("Training data:", train.shape)
-print("Valid data:", valid.shape)
-print("Test data:", test.shape)
-for X in test:
-    print(X[0], [x.shape for x in X[1:]])
-exit()
+print('Inputs:', inputs)
+
 # ===========================================================================
 # Get model
 # ===========================================================================
@@ -79,8 +61,7 @@ parameters = model.parameters
 
 cm = K.metrics.confusion_matrix(prob, y_true=y, labels=nb_classes)
 
-print("Inputs:", model.placeholders)
-print("#Params:", model.nb_parameters, model.nb_parameters * 4. / 1024 / 1024, "MB")
+print(model)
 optimizer = K.optimizers.RMSProp(lr=0.00001,
     decay_steps=train.shape[0] // args['bs'],
     decay_rate=0.9)
@@ -103,15 +84,15 @@ f_pred = K.function(OrderedDict([(i, j)
 # Build trainer
 # ===========================================================================
 print('Start training ...')
-task = training.MainLoop(batch_size=args['bs'], seed=12, shuffle_level=2,
-                         allow_rollback=True, print_progress=True,
-                         confirm_exit=False)
+task = training.MainLoop(batch_size=args['bs'], seed=120825, shuffle_level=2,
+                         allow_rollback=True)
 task.set_save(MODEL_PATH, model)
 task.set_callbacks([
     training.NaNDetector(),
-    training.EarlyStopGeneralizationLoss('valid', cost, threshold=5, patience=5)
+    training.EarlyStopGeneralizationLoss('valid', cost,
+                                         threshold=5, patience=5)
 ])
-task.set_train_task(f_train, train, epoch=12, name='train')
+task.set_train_task(f_train, train, epoch=args.epoch, name='train')
 task.set_valid_task(f_test, valid,
                     freq=training.Timer(percentage=0.4), name='valid')
 task.run()
