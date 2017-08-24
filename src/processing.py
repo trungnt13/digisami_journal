@@ -178,7 +178,6 @@ def get_dataset(dsname=['est'],
                 feats=['mspec', 'pitch', 'vad'],
                 normalize=['mspec'],
                 mode='bin',
-                gender=False,
                 context=100, hop=None, seq=True,
                 nb_topics=6, unite_topics=False,
                 ncpu=6, seed=12082518):
@@ -211,6 +210,8 @@ def get_dataset(dsname=['est'],
         laugh = cPickle.load(f)
     with open(os.path.join(ds.path, 'topic'), 'r') as f:
         topic = cPickle.load(f)
+    with open(os.path.join(ds.path, 'gender'), 'r') as f:
+        gender = cPickle.load(f)
     # ====== get the indices of given languages ====== #
     indices = [(name, start, end)
                for name, (start, end) in ds['indices'].iteritems()
@@ -241,6 +242,7 @@ def get_dataset(dsname=['est'],
                     for s, e, tp in alltopic]
              for name, alltopic in topic.iteritems()}
     print(ctext("#Audio Files:", 'cyan'), len(length))
+
     # ====== split train test ====== #
     train, valid, test = train_valid_test_split(indices,
         cluster_func=lambda x: x[0].split('/')[0],

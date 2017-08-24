@@ -46,10 +46,6 @@ for path in inpath:
     lang = 'est' if 'estonian' in path else ('fin' if 'finnish' in path else
                                              'sam')
     print("Input path:", path)
-    audio_path = os.path.join(path, 'audio')
-    segments += [
-        (lang + '/' + os.path.basename(f).replace('.wav', ''), f, 0, -1, 0)
-        for f in get_all_files(audio_path, lambda x: '.wav' == x[-4:])]
     # ====== read laugh anno ====== #
     laugh.update(
         {lang + '/' + os.path.basename(f).replace('.csv', ''):
@@ -58,6 +54,13 @@ for path in inpath:
             dtype='str', delimiter=':', skip_header=3))]
          for f in get_all_files(os.path.join(path, 'laugh_csv'))}
     )
+    # ====== read audio ====== #
+    audio_path = os.path.join(path, 'audio')
+    segs = [(lang + '/' + os.path.basename(f).replace('.wav', ''), f, 0, -1, 0)
+            for f in get_all_files(audio_path, lambda x: '.wav' == x[-4:])]
+    # only add segments that contains laugh annotation
+    segs = [(n, p, s, e, c) for n, p, s, e, c in segs if n in laugh]
+    segments += segs
     # ====== read topic anno ====== #
     topic.update(
         {lang + '/' + os.path.basename(f).replace('.csv', ''):
