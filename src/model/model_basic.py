@@ -5,7 +5,7 @@ import tensorflow as tf
 
 
 @N.ModelDescriptor
-def fnn(X, y, nb_classes):
+def fnn(X, gender, topic, y, nb_classes):
     f = N.Sequence([
         N.Flatten(outdim=2),
         N.Dense(num_units=1024, b_init=None),

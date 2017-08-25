@@ -8,11 +8,8 @@ train, valid, test, nb_classes = get_dataset(
     feats=['mspec', 'pitch', 'vad'],
     normalize=['mspec'],
     mode='tri',
-    context=100, hop=20, seq=True,
+    context=100, hop=1, seq=True,
     nb_topics=6, unite_topics=True,
-    ncpu=4, seed=12)
-for X, y in train:
-    print(X.shape, y.shape)
-print(train.shape)
-print(valid.shape)
-print(test.shape)
+    ncpu=6, seed=12)
+for X, gen, tpc, y in train:
+    print(X.shape, gen.shape, tpc.shape, y.shape)

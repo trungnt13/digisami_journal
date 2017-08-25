@@ -6,7 +6,7 @@ from six.moves import cPickle
 
 import numpy as np
 from odin.utils import (flatten_list, cache_disk, one_hot,
-                        as_list, ctext, UnitTimer)
+                        as_list, ctext, UnitTimer, Progbar)
 from odin import fuel as F
 from odin.stats import train_valid_test_split, freqcount
 
@@ -79,11 +79,10 @@ class LaughTrans(F.recipes.FeederRecipe):
         start = int(np.floor(start / unit))
         end = int(np.floor(end / unit))
         laugh = self.laugh[name]
-        gender = self.gender[lang] if self.gender is not None else None
+        gender = self.gender[lang]
         # ====== create labels ====== #
         labels = np.zeros(shape=(X[0].shape[0],), dtype='float32')
-        if gender is not None:
-            genfeat = np.zeros(shape=(X[0].shape[0],), dtype='float32')
+        genfeat = np.zeros(shape=(X[0].shape[0],), dtype='float32')
         for spkID, s, e, anno in laugh:
             if ('fl,' in anno or 'st,' in anno) and\
             (s <= end and start <= e):
@@ -93,17 +92,14 @@ class LaughTrans(F.recipes.FeederRecipe):
                 lau = 1 if self.mode == 'bin' else LAUGH.index(anno.split(',')[0])
                 labels[overlap_start:overlap_start + overlap_length] = lau
                 # gender features
-                if gender is not None:
-                    gen = GENDER.index(gender[spkID])
-                    genfeat[overlap_start:overlap_start + overlap_length] = gen
+                gen = GENDER.index(gender[spkID])
+                genfeat[overlap_start:overlap_start + overlap_length] = gen
         # ====== add new labels and features ====== #
-        if gender is not None:
-            X.append(genfeat)
-        X = np.concatenate(
-            [np.expand_dims(x, -1) if x.ndim == 1 else x for x in X],
-            axis=-1)
+        X = [np.concatenate([np.expand_dims(x, -1) if x.ndim == 1 else x
+                             for x in X], axis=-1),
+             np.expand_dims(genfeat, axis=-1)]
         y.append(one_hot(labels, self.nb_classes))
-        return orig_name, [X], y
+        return orig_name, X, y
 
     def shape_transform(self, shapes, indices):
         """
@@ -114,9 +110,9 @@ class LaughTrans(F.recipes.FeederRecipe):
         indices: dict
             {name: nb_samples}
         """
-        gender = 0 if self.gender is None else 1
-        shapes = [(shapes[0][0], sum(1 if len(s) == 1 else s[-1]
-                                     for s in shapes) + gender)]
+        n = shapes[0][0]
+        shapes = [(n, sum(1 if len(s) == 1 else s[-1] for s in shapes)),
+                  (n, 1)]
         return shapes, indices
 
 
@@ -162,7 +158,7 @@ class TopicTrans(F.recipes.FeederRecipe):
                 overlap_length = min(e, end) - max(s, start)
                 labels[overlap_start:overlap_start + overlap_length] = topicID
         # ====== add new features ====== #
-        X[0] = np.concatenate((X[0], labels), axis=-1)
+        X.append(labels)
         return orig_name, X, y
 
     def shape_transform(self, shapes, indices):
@@ -174,7 +170,8 @@ class TopicTrans(F.recipes.FeederRecipe):
         indices: dict
             {name: nb_samples}
         """
-        shapes = [(shapes[0][0], shapes[0][1] + 1)]
+        n = shapes[0][0]
+        shapes.append((n, 1))
         return shapes, indices
 
 
@@ -185,7 +182,7 @@ def get_dataset(dsname=['est'],
                 feats=['mspec', 'pitch', 'vad'],
                 normalize=['mspec'],
                 mode='bin',
-                context=100, hop=None, seq=True,
+                context=30, hop=1, seq=True,
                 nb_topics=6, unite_topics=False,
                 ncpu=6, seed=12082518):
     """
@@ -208,15 +205,13 @@ def get_dataset(dsname=['est'],
         * pitch
         * f0
         * vad
-        * topic
-        * gender
 
     Note
     ----
     Order of the features:
-        * all_original_features_concatenated
-        * Gender features
-        * Topic features
+        * all_original_features_concatenated (n, ...)
+        * Gender features (n, 1)
+        * Topic features (n, 1)
     """
     # ====== prepare arguments ====== #
     np.random.seed(seed)
@@ -225,8 +220,8 @@ def get_dataset(dsname=['est'],
     normalize = as_list(normalize, t=str)
     mode = str(mode)
     ds = F.Dataset(outpath, read_only=True)
-    if hop is None:
-        hop = context // 4
+    context = int(context)
+    hop = int(hop)
     # ====== annotations ====== #
     with open(os.path.join(ds.path, 'laugh'), 'r') as f:
         laugh = cPickle.load(f)
@@ -279,19 +274,11 @@ def get_dataset(dsname=['est'],
     print(ctext("#Test Utterances:", 'cyan'), len(test),
          freqcount(test, key=lambda x: x[0].split('/')[0]))
     # ====== create feeder and recipes ====== #
-    enable_topic = False
-    if 'topic' in feats:
-        enable_topic = True
-        feats.remove('topic')
-    enable_gender = False
-    if 'gender' in feats:
-        enable_gender = True
-        feats.remove('gender')
     data = [ds[i] for i in feats]
     train = F.Feeder(data, indices=train, dtype='float32',
                      ncpu=ncpu, buffer_size=12)
     valid = F.Feeder(data, indices=valid, dtype='float32',
-                     ncpu=ncpu, buffer_size=8)
+                     ncpu=ncpu, buffer_size=4)
     test = F.Feeder(data, indices=test, dtype='float32',
                     ncpu=2, buffer_size=1)
     # ====== recipes ====== #
@@ -302,10 +289,9 @@ def get_dataset(dsname=['est'],
                                  data_idx=feats.index(i))
          for i in normalize if i + '_mean' in ds],
         # Laugh annotation and gender feature
-        LaughTrans(laugh, gender=gender if enable_gender else None, mode=mode),
+        LaughTrans(laugh, gender=gender, mode=mode),
         # Adding topic features
-        TopicTrans(topic, nb_topics=nb_topics, unite_topics=unite_topics)
-        if enable_topic else None,
+        TopicTrans(topic, nb_topics=nb_topics, unite_topics=unite_topics),
         # Sequencing of Stacking
         F.recipes.Sequencing(frame_length=context,
                              hop_length=hop,
@@ -324,5 +310,14 @@ def get_dataset(dsname=['est'],
     print(ctext("Valid shape:", 'cyan'), valid.shape)
     print(ctext("Test shape:", 'cyan'), test.shape)
     print(ctext("#Classes:", 'cyan'), nb_classes)
+    # ====== some test ====== #
+    # for X in Progbar(target=train,
+    #                  print_report=True, print_summary=True
+    #                  ).set_iter_info(lambda x: x[0].shape[0],
+    #                                  lambda x: [('X', x[0].shape),
+    #                                             ('Gen', x[1].shape),
+    #                                             ('Topic', x[2].shape),
+    #                                             ('y', x[3].shape)]):
+    #     pass
     # ====== estimate nb_classes ====== #
     return train, valid, test, nb_classes
