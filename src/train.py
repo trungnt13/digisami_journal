@@ -196,5 +196,5 @@ with open(PRED_PATH, 'w') as f:
     cPickle.dump((y_pred, y_true, gender, topic), f,
                  protocol=cPickle.HIGHEST_PROTOCOL)
 # ====== evaluation ====== #
-evaluate_smooth_label(y_pred, y_true, gender, topic, save_path=FIG_PATH)
 evaluate_general_performance(y_pred, y_true, gender, topic)
+evaluate_smooth_label(y_pred, y_true, gender, topic, save_path=FIG_PATH)
