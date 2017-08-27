@@ -18,10 +18,7 @@ def fnn(X, gender, topic, y, nb_classes):
     ], debug=True)
     y_logits = f(X)
     y_prob = tf.nn.softmax(y_logits)
-    ce = tf.losses.softmax_cross_entropy(y, y_logits)
-    acc = K.metrics.categorical_accuracy(y_prob, y)
-    return {'prob': y_prob, 'logit': y_logits,
-            'cost': ce, 'acc': acc}
+    return {'prob': y_prob, 'logit': y_logits}
 
 
 @N.ModelDescriptor

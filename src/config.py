@@ -19,7 +19,7 @@ test2 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mspec', 'pitch', 'vad'],
     'normalize': ['mspec'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 30,
     'seq': True,

@@ -88,10 +88,9 @@ def tokenize(docs, keep_stopword=True, keep_oov=True, keep_punct=False,
 # Main
 # ===========================================================================
 @cache_disk
-def train_topic_clusters(text, keep_stopword=True, keep_oov=True, keep_punct=False,
-                         lemmatizer=True, stem=True, lower=True,
-                         nb_topics=6, nb_top_words=12,
-                         print_log=True):
+def _create_model(text, keep_stopword=True, keep_oov=True, keep_punct=False,
+                  lemmatizer=True, stem=True, lower=True,
+                  nb_topics=6, nb_top_words=12):
     original_text = list(text)
     text = [preprocess_text(t) for t in text]
     text = tokenize(text, keep_stopword=keep_stopword, keep_oov=keep_oov,
@@ -109,18 +108,38 @@ def train_topic_clusters(text, keep_stopword=True, keep_oov=True, keep_punct=Fal
                                    random_state=0)
     Y = np.argmax(lda.fit_transform(tk_vec), axis=-1)
     assert len(Y) == len(text) and len(Y) == len(original_text)
-    if print_log:
-        print("\nTopics in LDA model:")
-        for topic_idx, tp in enumerate(lda.components_):
-            topic_terms = [terms[i]
-                           for i in tp.argsort()[:-nb_top_words - 1:-1]]
-            print(ctext("Topic #%d:", 'yellow') % topic_idx,
-                  " ".join(topic_terms))
-            samples = [original_text[i]
-                for i, y in enumerate(Y) if y == topic_idx]
-            samples = np.random.choice(samples, size=min(25, len(samples)),
-                                       replace=False)
-            for s in samples:
-                print("  ", s)
+    print("\nTopics in LDA model:")
+    keywords = {}
+    sentences = {}
+    for topic_idx, tp in enumerate(lda.components_):
+        # store keywords
+        topic_terms = [terms[i]
+                       for i in tp.argsort()[:-nb_top_words - 1:-1]]
+        keywords[topic_idx] = topic_terms
+        # store sampled sentences
+        samples = [original_text[i]
+            for i, y in enumerate(Y) if y == topic_idx]
+        samples = np.random.choice(samples, size=min(25, len(samples)),
+                                   replace=False)
+        sentences[topic_idx] = samples
     # ====== create return results ====== #
-    return {i: j for i, j in zip(original_text, Y)}
+    keywords = [val for idx, val in sorted(keywords.items(), key=lambda x: x[0])]
+    sentences = [val for idx, val in sorted(sentences.items(), key=lambda x: x[0])]
+    return keywords, sentences, \
+        {i: j for i, j in zip(original_text, Y)}
+
+
+def train_topic_clusters(text, keep_stopword=True, keep_oov=True, keep_punct=False,
+                         lemmatizer=True, stem=True, lower=True,
+                         nb_topics=6, nb_top_words=12,
+                         print_log=True):
+    keywords, sentences, model = _create_model(text,
+            keep_stopword=keep_stopword, keep_oov=keep_oov, keep_punct=keep_punct,
+            lemmatizer=lemmatizer, stem=stem, lower=lower,
+            nb_topics=nb_topics, nb_top_words=nb_top_words)
+    for i in range(nb_topics):
+        print(ctext("Topic #%d:", 'yellow') % i,
+              " ".join(keywords[i]))
+        for j in set(sentences[i]):
+            print('\t', j)
+    return model

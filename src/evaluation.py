@@ -92,6 +92,10 @@ def evaluate_general_performance(y_pred, y_true, gender, topic):
 # ===========================================================================
 # Method 2
 # ===========================================================================
+def prediction_2D(pred, threshold):
+    return (pred[:, -1] >= threshold).astype('int32')
+
+
 def prediction_3D(pred, threshold_x, threshold_y):
     pred_x = pred[:, 1] >= threshold_x
     pred_y = pred[:, 2] >= threshold_y
@@ -108,10 +112,13 @@ def prediction_3D(pred, threshold_x, threshold_y):
     return np.array(final_pred, dtype='int32')
 
 
-def evaluate_smooth_label(y_pred, y_true, gender, topic):
+def evaluate_smooth_label(y_pred, y_true, gender, topic,
+                          save_path='/tmp/tmp.pdf'):
     name = y_pred.keys()
+    nb_classes = y_pred.values()[0].shape[1]
     np.random.shuffle(name)
     # ====== No Calibration ====== #
+    # Make prediction
     pred = np.argmax(fast_sort(y_pred), axis=-1)
     true = fast_sort(y_true)
     gen = fast_sort(gender)
@@ -119,12 +126,6 @@ def evaluate_smooth_label(y_pred, y_true, gender, topic):
     assert len(pred) == len(true) == len(gen) == len(tpc)
     title("NO calibration performance (%d)" % (len(pred)))
     basic_report(pred, true, gen, tpc)
-    # ====== visualize ====== #
-    # for n in name:
-    #     print(ctext("Visualizing prediction file: %s" % n, 'magenta'))
-    #     pred = y_pred[n]
-    #     true = y_true[n]
-    #     plot_laugh_prediction(pred, true, name=n)
     # ====== calibration ====== #
     samples = {}
     for n in name:
@@ -135,14 +136,13 @@ def evaluate_smooth_label(y_pred, y_true, gender, topic):
     pred = fast_sort({s: y_pred[s] for s in samples})
     true = fast_sort({s: y_true[s] for s in samples})
     # For binary
-    if pred.shape[-1] == 2:
-        threshold = np.linspace(0., 1., num=120)
-        performance = [f1_score(true, (pred[:, -1] >= t).astype('int32'),
-                                average='macro')
+    if nb_classes == 2:
+        threshold = np.linspace(0., 1., num=240)
+        performance = [f1_score(true, prediction_2D(pred, t), average='macro')
                        for t in threshold]
         plot_2D_threshold(threshold, performance)
     # For trinary
-    elif pred.shape[-1] == 3:
+    elif nb_classes == 3:
         threshold = [(x, y)
                      for x in np.linspace(0., 1., num=50)
                      for y in np.linspace(0., 1., num=50)]
@@ -161,8 +161,8 @@ def evaluate_smooth_label(y_pred, y_true, gender, topic):
     print('\n', ctext('Best threshold/performance:', 'yellow'),
           best_threshold, best_performance)
     # ====== Calibration ====== #
-    if pred.shape[-1] == 2:
-        pred = (fast_sort(y_pred)[:, -1] >= best_threshold).astype('int32')
+    if nb_classes == 2:
+        pred = prediction_2D(fast_sort(y_pred), best_threshold)
     else:
         pred = prediction_3D(fast_sort(y_pred), best_threshold[0], best_threshold[1])
     true = fast_sort(y_true)
@@ -171,5 +171,17 @@ def evaluate_smooth_label(y_pred, y_true, gender, topic):
     assert len(pred) == len(true) == len(gen) == len(tpc)
     title("Calibration performance (%d)" % (len(pred)))
     basic_report(pred, true, gen, tpc)
-    plot_save('/tmp/tmp.pdf')
-    exit()
+
+    # ====== visualize and save everything ====== #
+    def calib_2D(x):
+        return prediction_2D(x, threshold=best_threshold)
+
+    def calib_3D(x):
+        return prediction_3D(x, best_threshold[0], best_threshold[1])
+
+    for n in name:
+        print(ctext("Visualizing prediction file: %s" % n, 'magenta'))
+        plot_laugh_prediction(y_pred[n], y_true[n],
+                              f_calibrate=calib_2D if nb_classes == 2 else calib_3D,
+                              name=n)
+    plot_save(save_path)
