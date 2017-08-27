@@ -6,7 +6,7 @@ from odin.utils import as_tuple_of_shape, ArgController, get_script_path, stdio,
 args = ArgController(
 ).add('model', 'name of model'
 ).add('config', 'name of config in const.py'
-).add('-bs', 'batch size', 128
+).add('-bs', 'batch size', 256
 ).add('-epoch', 'nb epoch', 8
 ).parse()
 
@@ -14,12 +14,15 @@ from collections import OrderedDict, defaultdict
 
 import numpy as np
 from scipy import stats
+from six.moves import cPickle
 
 from odin import backend as K, nnet as N, training
 
 from processing import get_dataset
 from const import outpath
 from config import *
+from evaluation import (evaluate_general_performance,
+                        evaluate_smooth_label)
 
 if args['config'] not in globals():
     raise ValueError("Cannot find feature configuration with name: '%s' in const.py"
@@ -37,15 +40,26 @@ MODEL_PATH = os.path.join(get_script_path(), 'results')
 if not os.path.exists(MODEL_PATH):
     os.mkdir(MODEL_PATH)
 MODEL_PATH = os.path.join(MODEL_PATH, MODEL_NAME)
+
+PRED_PATH = os.path.join(get_script_path(), 'pred')
+if not os.path.exists(PRED_PATH):
+    os.mkdir(PRED_PATH)
+PRED_PATH = os.path.join(PRED_PATH, MODEL_NAME)
+
 stdio(path=LOG_PATH)
 
 print("Log path:", LOG_PATH)
 print("Model path:", MODEL_PATH)
+print("Pred path:", PRED_PATH)
 
 # ===========================================================================
 # Dataset
 # ===========================================================================
-train, valid, test, nb_classes = get_dataset(**globals()[args.config])
+CONFIG = globals()[args.config]
+if 'vad' in CONFIG['feats'] and 'vad' != CONFIG['feats'][-1]:
+    raise RuntimeError("`vad` must be specified as the last element in `feats`.")
+
+train, valid, test, nb_classes = get_dataset(**CONFIG)
 X = [K.placeholder(shape=(None,) + s[1:], dtype='float32', name='input%d' % i)
      for i, s in enumerate(as_tuple_of_shape(train.shape))]
 y = K.placeholder(shape=(None, nb_classes), dtype='float32', name='laughter')
@@ -119,27 +133,17 @@ def sort_by_name(segs):
 
 def gender_process(x):
     # get the non-zero mode element
-    x = [i.ravel() for i in x]
-    x = [i[np.nonzero(i)[0]] for i in x]
-    x = np.array([0 if len(i) == 0 else stats.mode(i)[0][0]
-                  for i in x])
-    return x
+    if x.ndim == 3:
+        return x[:, -1, 0]
+    elif x.ndim == 2:
+        return x[:, x.shape[-1] // 2]
+    raise ValueError()
 
 
 def topic_process(x):
     x = stats.mode(x, axis=1)[0]
     return x.ravel()
 
-
-def report_performance(y_pred, y_true):
-    from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
-    print("===== Frame Prediction =====")
-    pred = np.argmax(np.concatenate(y_pred, 0), axis=-1)
-    true = np.concatenate(y_true, 0)
-    print("Accuracy:", accuracy_score(true, pred))
-    print("F1:", f1_score(true, pred, average='micro'))
-    print("Confusion matrix:")
-    print(confusion_matrix(true, pred))
 
 # ====== init ====== #
 y_pred = defaultdict(lambda: defaultdict(list))
@@ -163,8 +167,9 @@ print()
 y_pred = {f: sort_by_name((name, sort_by_idx(pred))
                           for name, pred in segs.iteritems())
           for f, segs in y_pred.iteritems()}
-y_true = {f: sort_by_name((name, sort_by_idx(pred))
-                          for name, pred in segs.iteritems())
+y_true = {f: np.argmax(sort_by_name((name, sort_by_idx(pred))
+                                    for name, pred in segs.iteritems()),
+                       axis=-1)
           for f, segs in y_true.iteritems()}
 gender = {f: gender_process(sort_by_name((name, sort_by_idx(pred))
                                          for name, pred in segs.iteritems()))
@@ -177,8 +182,10 @@ assert set(y_pred.keys()) == set(y_true.keys())
 for name in y_pred.keys():
     assert y_pred[name].shape[0] == y_true[name].shape[0] == \
     gender[name].shape[0] == topic[name].shape[0]
-exit()
-print("*********************************")
-print("* Test")
-print("*********************************")
-report_performance(y_pred, y_true)
+# save everything
+with open(PRED_PATH, 'w') as f:
+    cPickle.dump((y_pred, y_true, gender, topic), f,
+                 protocol=cPickle.HIGHEST_PROTOCOL)
+# ====== evaluation ====== #
+evaluate_smooth_label(y_pred, y_true, gender, topic)
+evaluate_general_performance(y_pred, y_true, gender, topic)

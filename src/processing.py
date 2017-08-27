@@ -5,6 +5,7 @@ from collections import defaultdict
 from six.moves import cPickle
 
 import numpy as np
+from scipy import stats
 from odin.utils import (flatten_list, cache_disk, one_hot,
                         as_list, ctext, UnitTimer, Progbar)
 from odin import fuel as F
