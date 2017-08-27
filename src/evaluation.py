@@ -137,7 +137,7 @@ def evaluate_smooth_label(y_pred, y_true, gender, topic,
     true = fast_sort({s: y_true[s] for s in samples})
     # For binary
     if nb_classes == 2:
-        threshold = np.linspace(0., 1., num=240)
+        threshold = np.linspace(0., 1., num=120)
         performance = [f1_score(true, prediction_2D(pred, t), average='macro')
                        for t in threshold]
         plot_2D_threshold(threshold, performance)

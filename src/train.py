@@ -119,7 +119,7 @@ task.set_callbacks([
 ])
 task.set_train_task(f_train, train, epoch=args.epoch, name='train')
 task.set_valid_task(f_test, valid,
-                    freq=training.Timer(percentage=0.4), name='valid')
+                    freq=training.Timer(percentage=0.5), name='valid')
 task.run()
 
 
