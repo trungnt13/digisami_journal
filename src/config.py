@@ -173,3 +173,169 @@ efmfcc7 = {
     'hop': 10,
     'seq': True,
 }
+
+# ===========================================================================
+# Including Sami dataset
+# ===========================================================================
+efsmspec0 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mspec'],
+    'normalize': ['mspec'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmspec1 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mspec', 'pitch'],
+    'normalize': ['mspec', 'pitch'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmspec2 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mspec', 'f0'],
+    'normalize': ['mspec', 'f0'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmspec3 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mspec', 'energy'],
+    'normalize': ['mspec', 'energy'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmspec4 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mspec', 'vad'],
+    'normalize': ['mspec'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmspec5 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mspec', 'energy', 'vad'],
+    'normalize': ['mspec', 'energy'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmspec6 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mspec', 'pitch', 'energy', 'vad'],
+    'normalize': ['mspec', 'pitch', 'energy'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmspec7 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mspec', 'pitch', 'f0', 'energy', 'vad'],
+    'normalize': ['mspec', 'pitch', 'f0', 'energy'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+# ===========================================================================
+# MFCC
+# ===========================================================================
+efsmfcc0 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mfcc'],
+    'normalize': ['mfcc'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmfcc1 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mfcc', 'pitch'],
+    'normalize': ['mfcc', 'pitch'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmfcc2 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mfcc', 'f0'],
+    'normalize': ['mfcc', 'f0'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmfcc3 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mfcc', 'energy'],
+    'normalize': ['mfcc', 'energy'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmfcc4 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mfcc', 'vad'],
+    'normalize': ['mfcc'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmfcc5 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mfcc', 'energy', 'vad'],
+    'normalize': ['mfcc', 'energy'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmfcc6 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mfcc', 'pitch', 'energy', 'vad'],
+    'normalize': ['mfcc', 'pitch', 'energy'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}
+
+efsmfcc7 = {
+    'dsname': ['est', 'fin', 'sam'],
+    'feats': ['mfcc', 'pitch', 'f0', 'energy', 'vad'],
+    'normalize': ['mfcc', 'pitch', 'f0', 'energy'],
+    'mode': 'bin',
+    'context': 30,
+    'hop': 10,
+    'seq': True,
+}

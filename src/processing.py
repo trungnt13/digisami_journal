@@ -17,6 +17,22 @@ from topic_clustering import train_topic_clusters
 
 GENDER = [None, 'F', 'M']
 LAUGH = [None, 'fl', 'st']
+ALL_LAUGH = [
+    None,
+    'fl, b',
+    'fl, d',
+    'fl, e',
+    'fl, m',
+    'fl, o',
+    'fl, o, p',
+    'fl, p',
+    'st, b',
+    'st, e',
+    'st, m',
+    'st, o',
+    'st, p'
+]
+_INSPECT_MODE = False
 
 # extract all text once for all
 ds = F.Dataset(outpath, read_only=True)
@@ -29,24 +45,21 @@ print(ctext("Total amount of transcription:", 'red'), len(_ALL_TEXT))
 # ===========================================================================
 # Helper function
 # ===========================================================================
-def _get_spks(name, dsname):
-    if 'est' in dsname: # C_05_FF_06_05
-        return name.split('_')[-2:]
-    if 'fin' in dsname: # E10_B_20110512_FF_11_10
-        return name.split('_')[-2:]
-    if 'sami' in dsname: # 04_20140227_IS-2
-        return name.split('_')[-1:]
-    raise RuntimeError
-
-
 def get_nb_classes(mode):
     if mode == 'bin':
         n = 2
     elif mode == 'tri':
         n = 3
+    elif mode == 'all':
+        n = len(ALL_LAUGH)
     else:
         raise ValueError(str(mode))
     return n
+
+
+def set_inspect_mode(mode):
+    global _INSPECT_MODE
+    _INSPECT_MODE = mode
 
 
 # ===========================================================================
@@ -65,8 +78,8 @@ class LaughTrans(F.recipes.FeederRecipe):
         self.laugh = laugh
         self.gender = gender
         mode = str(mode).lower()
-        if mode not in ("bin", "tri"):
-            raise ValueError("mode must be: 'bin', 'tri' but given %s" % mode)
+        if mode not in ("bin", "tri", "all"):
+            raise ValueError("mode must be: 'bin', 'tri', 'all' but given %s" % mode)
         self.mode = mode
         self.nb_classes = get_nb_classes(mode)
 
@@ -90,16 +103,22 @@ class LaughTrans(F.recipes.FeederRecipe):
                 overlap_start = max(start, s) - start
                 overlap_length = min(e, end) - max(s, start)
                 # laugh annotation
-                lau = 1 if self.mode == 'bin' else LAUGH.index(anno.split(',')[0])
+                lau = 1 if self.mode == 'bin' else \
+                    (LAUGH.index(anno.split(',')[0]) if self.mode == 'tri' else
+                     ALL_LAUGH.index(anno))
                 labels[overlap_start:overlap_start + overlap_length] = lau
                 # gender features
                 gen = GENDER.index(gender[spkID])
                 genfeat[overlap_start:overlap_start + overlap_length] = gen
         # ====== add new labels and features ====== #
-        X = [np.concatenate([np.expand_dims(x, -1) if x.ndim == 1 else x
-                             for x in X], axis=-1),
-             np.expand_dims(genfeat, axis=-1)]
-        y.append(one_hot(labels, self.nb_classes))
+        if not _INSPECT_MODE:
+            X = [np.concatenate([np.expand_dims(x, -1) if x.ndim == 1 else x
+                                 for x in X], axis=-1),
+                 np.expand_dims(genfeat, axis=-1)]
+            y.append(one_hot(labels, self.nb_classes))
+        else:
+            X.append(genfeat)
+            y.append(labels)
         return orig_name, X, y
 
     def shape_transform(self, shapes, indices):
@@ -112,8 +131,11 @@ class LaughTrans(F.recipes.FeederRecipe):
             {name: nb_samples}
         """
         n = shapes[0][0]
-        shapes = [(n, sum(1 if len(s) == 1 else s[-1] for s in shapes)),
-                  (n, 1)]
+        if _INSPECT_MODE:
+            shapes.append((n,))
+        else:
+            shapes = [(n, sum(1 if len(s) == 1 else s[-1] for s in shapes)),
+                      (n, 1)]
         return shapes, indices
 
 
@@ -159,7 +181,7 @@ class TopicTrans(F.recipes.FeederRecipe):
                 overlap_length = min(e, end) - max(s, start)
                 labels[overlap_start:overlap_start + overlap_length] = topicID
         # ====== add new features ====== #
-        X.append(labels)
+        X.append(labels.ravel() if _INSPECT_MODE else labels)
         return orig_name, X, y
 
     def shape_transform(self, shapes, indices):
@@ -194,6 +216,7 @@ def get_dataset(dsname=['est'],
     mode:
         'bin'- binary laugh and non-laugh
         'tri' - speech laugh
+        'all' - all type of laugh
     unite_topics: bool, if True, train 1 topic clustering model for all
     dataset
 
@@ -262,6 +285,25 @@ def get_dataset(dsname=['est'],
              for name, alltopic in topic.iteritems()
              if name in length}
     print(ctext("#Audio Files:", 'cyan'), len(length), len(laugh), len(topic))
+    # ====== INPSECTATION MODE ====== #
+    if _INSPECT_MODE:
+        data = [ds[i] for i in feats]
+        feeder = F.Feeder(data, indices=indices, dtype='float32',
+                          ncpu=ncpu, buffer_size=1)
+        feeder.set_recipes([
+            [F.recipes.Normalization(mean=ds[i + '_mean'],
+                                     std=ds[i + '_std'],
+                                     local_normalize=None,
+                                     data_idx=feats.index(i))
+             for i in normalize if i + '_mean' in ds],
+            # Laugh annotation and gender feature
+            LaughTrans(laugh, gender=gender, mode=mode),
+            # Adding topic features
+            TopicTrans(topic, nb_topics=nb_topics, unite_topics=unite_topics),
+            F.recipes.CreateFile()
+        ])
+        feeder.set_batch(batch_size=2056, seed=None, shuffle_level=0)
+        return feeder
     # ====== split train test ====== #
     train, valid, test = train_valid_test_split(indices,
         cluster_func=lambda x: x[0].split('/')[0],

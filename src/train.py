@@ -22,6 +22,7 @@ from odin import backend as K, nnet as N, training
 from processing import get_dataset
 from const import outpath
 from config import *
+from config1 import *
 from evaluation import (evaluate_general_performance,
                         evaluate_smooth_label)
 
@@ -100,10 +101,7 @@ print('Building testing functions ...')
 f_test = K.function(model.placeholders, [cost_train, acc, cm],
                     training=False)
 print('Building predicting functions ...')
-f_pred = K.function(OrderedDict([(i, j)
-                                for i, j in model.placeholders.iteritems()
-                                if 'input' in j.name]),
-                    outputs['prob'], training=False)
+f_pred = K.function(X, prob, training=False)
 
 # ===========================================================================
 # Build trainer
@@ -167,7 +165,7 @@ for name, idx, X, gen, tpc, y in test:
     prog['Name'] = name
     prog['Index'] = idx
     prog.add(X.shape[0])
-    y_pred[short_name][name].append((idx, f_pred(X)))
+    y_pred[short_name][name].append((idx, f_pred(X, gen, tpc)))
     y_true[short_name][name].append((idx, y))
     gender[short_name][name].append((idx, gen))
     topic[short_name][name].append((idx, tpc))
