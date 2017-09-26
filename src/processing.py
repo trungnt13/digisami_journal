@@ -19,18 +19,8 @@ GENDER = [None, 'F', 'M']
 LAUGH = [None, 'fl', 'st']
 ALL_LAUGH = [
     None,
-    'fl, b',
-    'fl, d',
-    'fl, e',
-    'fl, m',
-    'fl, o',
-    'fl, o, p',
-    'fl, p',
-    'st, b',
-    'st, e',
-    'st, m',
-    'st, o',
-    'st, p'
+    'fl, b', 'fl, e', 'fl, m', 'fl, o', 'fl, p',
+    'st, b', 'st, e', 'st, m', 'st, o', 'st, p'
 ]
 _INSPECT_MODE = False
 
@@ -99,13 +89,20 @@ class LaughTrans(F.recipes.FeederRecipe):
         genfeat = np.zeros(shape=(X[0].shape[0],), dtype='float32')
         for spkID, s, e, anno in laugh:
             if ('fl,' in anno or 'st,' in anno) and\
-            (s <= end and start <= e):
+            (s <= end and start <= e) and\
+            anno in ALL_LAUGH:
                 overlap_start = max(start, s) - start
                 overlap_length = min(e, end) - max(s, start)
                 # laugh annotation
-                lau = 1 if self.mode == 'bin' else \
-                    (LAUGH.index(anno.split(',')[0]) if self.mode == 'tri' else
-                     ALL_LAUGH.index(anno))
+                if self.mode == 'bin':
+                    lau = 1
+                elif self.mode == 'tri':
+                    lau = LAUGH.index(anno.split(',')[0])
+                elif self.mode == 'all':
+                    if anno in ALL_LAUGH:
+                        lau = ALL_LAUGH.index(anno)
+                else:
+                    raise RuntimeError("Unknown `mode`='%s'" % self.mode)
                 labels[overlap_start:overlap_start + overlap_length] = lau
                 # gender features
                 gen = GENDER.index(gender[spkID])
@@ -121,22 +118,18 @@ class LaughTrans(F.recipes.FeederRecipe):
             y.append(labels)
         return orig_name, X, y
 
-    def shape_transform(self, shapes, indices):
-        """
-        Parameters
-        ----------
-        shapes: list of shape
-            list of shape tuple
-        indices: dict
-            {name: nb_samples}
-        """
-        n = shapes[0][0]
+    def shape_transform(self, shapes):
+        n = shapes[0][0][0]
+        ids = shapes[0][1]
+        # append gender features
         if _INSPECT_MODE:
-            shapes.append((n,))
+            shapes.append(
+                ((n,), list(ids)))
         else:
-            shapes = [(n, sum(1 if len(s) == 1 else s[-1] for s in shapes)),
-                      (n, 1)]
-        return shapes, indices
+            shapes = [(n, sum(1 if len(shp) == 1 else shp[-1]
+                              for shp, ids in shapes), list(ids)),
+                      ((n, 1), list(ids))]
+        return shapes
 
 
 class TopicTrans(F.recipes.FeederRecipe):
@@ -184,7 +177,7 @@ class TopicTrans(F.recipes.FeederRecipe):
         X.append(labels.ravel() if _INSPECT_MODE else labels)
         return orig_name, X, y
 
-    def shape_transform(self, shapes, indices):
+    def shape_transform(self, shapes):
         """
         Parameters
         ----------
@@ -193,9 +186,11 @@ class TopicTrans(F.recipes.FeederRecipe):
         indices: dict
             {name: nb_samples}
         """
-        n = shapes[0][0]
-        shapes.append((n, 1))
-        return shapes, indices
+        n = shapes[0][0][0]
+        ids = shapes[0][1]
+        shapes.append(
+            ((n,), list(ids)))
+        return shapes
 
 
 # ===========================================================================
@@ -285,22 +280,24 @@ def get_dataset(dsname=['est'],
              for name, alltopic in topic.iteritems()
              if name in length}
     print(ctext("#Audio Files:", 'cyan'), len(length), len(laugh), len(topic))
+    # ====== get all types of data ====== #
+    data = [ds[i] for i in feats]
     # ====== INPSECTATION MODE ====== #
     if _INSPECT_MODE:
-        data = [ds[i] for i in feats]
-        feeder = F.Feeder(data, indices=indices, dtype='float32',
+        feeder = F.Feeder(F.DataDescriptor(data=data, indices=indices),
+                          dtype='float32', batch_mode='file',
                           ncpu=ncpu, buffer_size=1)
         feeder.set_recipes([
-            [F.recipes.Normalization(mean=ds[i + '_mean'],
-                                     std=ds[i + '_std'],
-                                     local_normalize=None,
-                                     data_idx=feats.index(i))
-             for i in normalize if i + '_mean' in ds],
+            # [F.recipes.Normalization(mean=ds[i + '_mean'],
+            #                          std=ds[i + '_std'],
+            #                          local_normalize=None,
+            #                          data_idx=feats.index(i))
+            #  for i in normalize if i + '_mean' in ds],
             # Laugh annotation and gender feature
             LaughTrans(laugh, gender=gender, mode=mode),
             # Adding topic features
-            TopicTrans(topic, nb_topics=nb_topics, unite_topics=unite_topics),
-            F.recipes.CreateFile()
+            TopicTrans(topic, nb_topics=nb_topics,
+                       unite_topics=unite_topics),
         ])
         feeder.set_batch(batch_size=2056, seed=None, shuffle_level=0)
         return feeder
@@ -317,12 +314,14 @@ def get_dataset(dsname=['est'],
     print(ctext("#Test Utterances:", 'cyan'), len(test),
          freqcount(test, key=lambda x: x[0].split('/')[0]))
     # ====== create feeder and recipes ====== #
-    data = [ds[i] for i in feats]
-    train = F.Feeder(data, indices=train, dtype='float32',
+    train = F.Feeder(F.DataDescriptor(data=data, indices=train),
+                     dtype='float32', batch_mode='batch',
                      ncpu=ncpu, buffer_size=12)
-    valid = F.Feeder(data, indices=valid, dtype='float32',
+    valid = F.Feeder(F.DataDescriptor(data=data, indices=valid),
+                     dtype='float32', batch_mode='batch',
                      ncpu=ncpu, buffer_size=4)
-    test = F.Feeder(data, indices=test, dtype='float32',
+    test = F.Feeder(F.DataDescriptor(data=data, indices=test),
+                    dtype='float32', batch_mode='file',
                     ncpu=2, buffer_size=1)
     # ====== recipes ====== #
     recipes = [
@@ -344,10 +343,9 @@ def get_dataset(dsname=['est'],
                            right_context=context // 2,
                            shift=hop)
     ]
-    train.set_recipes(recipes + [F.recipes.CreateBatch()])
-    valid.set_recipes(recipes + [F.recipes.CreateBatch()])
-    test.set_recipes(recipes + [F.recipes.CreateFile()]
-        ).set_batch(batch_size=256, seed=None)
+    train.set_recipes(recipes)
+    valid.set_recipes(recipes)
+    test.set_recipes(recipes).set_batch(batch_size=256, seed=None)
     nb_classes = get_nb_classes(mode)
     print(ctext("Train shape:", 'cyan'), train.shape)
     print(ctext("Valid shape:", 'cyan'), valid.shape)

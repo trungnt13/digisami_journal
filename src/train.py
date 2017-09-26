@@ -23,6 +23,8 @@ from processing import get_dataset
 from const import outpath
 from config import *
 from config1 import *
+from config2 import *
+from config3 import *
 from evaluation import (evaluate_general_performance,
                         evaluate_smooth_label)
 

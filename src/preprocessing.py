@@ -15,7 +15,7 @@ import numpy as np
 
 from odin import fuel as F, visual as V
 from odin.utils import get_all_files
-from const import inpath, outpath, CUT_DURATION
+from const import inpath, outpath, CUT_DURATION, rawpath
 
 
 # ===========================================================================
@@ -86,29 +86,46 @@ print("Gender: %d (spk)" % sum(len(i) for i in gender.values()))
 
 
 # ===========================================================================
+# Cutting the audio
+# ===========================================================================
+if not os.path.exists(rawpath):
+    raw = F.WaveProcessor(segments, rawpath,
+                          sr=None, sr_info={}, sr_new=16000, best_resample=True,
+                          audio_ext=None, pcm=False,
+                          remove_dc_offset=True, remove_zeros=True,
+                          maxlen=CUT_DURATION,
+                          vad_split=False, vad_split_args={},
+                          dtype='float16', datatype='memmap',
+                          ignore_error=False, ncache=180, ncpu=12)
+    raw.run()
+    F.validate_features(raw, '/tmp/digisami_raw', override=True)
+raw = F.Dataset(rawpath, read_only=True)
+# ===========================================================================
 # Processing
 # ===========================================================================
 if os.path.exists(outpath):
+    print("Removing old dataset at path:", outpath)
     shutil.rmtree(outpath)
 # ====== FEAT ====== #
-feat = F.SpeechProcessor(segments, outpath,
-            sr=None, sr_info={}, sr_new=16000,
-            win=0.02, hop=0.01, window='hann',
+feat = F.SpeechProcessor(raw, outpath,
+            sr=None, sr_info={}, sr_new=None, best_resample=False,
+            win=0.025, hop=0.005, window='hann',
             nb_melfilters=40, nb_ceps=13,
             get_spec=True, get_qspec=False, get_phase=False,
             get_pitch=True, get_f0=True,
-            get_vad=True, get_energy=True, get_delta=2,
+            get_vad=3, get_energy=True, get_delta=2,
             fmin=64, fmax=None,
             pitch_threshold=0.3, pitch_fmax=360, pitch_algo='swipe',
             vad_smooth=3, vad_minlen=0.1,
             cqt_bins=96, preemphasis=0.97,
             center=True, power=2, log=True, backend='odin',
             pca=True, pca_whiten=False,
-            audio_ext=None, maxlen=CUT_DURATION,
+            audio_ext=None, maxlen=None,
             save_raw=True, save_stats=True,
             substitute_nan=None, dtype='float16', datatype='memmap',
-            ncache=0.08, ncpu=8)
+            ncache=120, ncpu=12)
 feat.run()
+F.validate_features(feat, '/tmp/digisami_feat', override=True)
 # ====== save ====== #
 with open(os.path.join(outpath, 'laugh'), 'w') as f:
     cPickle.dump(laugh, f)

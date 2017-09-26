@@ -1,94 +1,81 @@
 from __future__ import print_function, division, absolute_import
 
-longcontext = {
-    'dsname': ['est', 'fin', 'sam'],
-    'feats': ['mspec'],
-    'normalize': ['mspec'],
-    'mode': 'bin',
-    'context': 80,
-    'hop': 10,
-    'seq': True,
-}
-
-# ===========================================================================
-# MFCC
-# ===========================================================================
-efstri0 = {
+stack0 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mfcc'],
     'normalize': ['mfcc'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 10,
-    'seq': True,
+    'seq': False,
 }
 
-efstri1 = {
+stack1 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mfcc', 'pitch'],
     'normalize': ['mfcc', 'pitch'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 10,
-    'seq': True,
+    'seq': False,
 }
 
-efstri2 = {
+stack2 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mfcc', 'f0'],
     'normalize': ['mfcc', 'f0'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 10,
-    'seq': True,
+    'seq': False,
 }
 
-efstri3 = {
+stack3 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mfcc', 'energy'],
     'normalize': ['mfcc', 'energy'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 10,
-    'seq': True,
+    'seq': False,
 }
 
-efstri4 = {
+stack4 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mfcc', 'vad'],
     'normalize': ['mfcc'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 10,
-    'seq': True,
+    'seq': False,
 }
 
-efstri5 = {
+stack5 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mfcc', 'energy', 'vad'],
     'normalize': ['mfcc', 'energy'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 10,
-    'seq': True,
+    'seq': False,
 }
 
-efstri6 = {
+stack6 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mfcc', 'pitch', 'energy', 'vad'],
     'normalize': ['mfcc', 'pitch', 'energy'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 10,
-    'seq': True,
+    'seq': False,
 }
 
-efstri7 = {
+stack7 = {
     'dsname': ['est', 'fin', 'sam'],
     'feats': ['mfcc', 'pitch', 'f0', 'energy', 'vad'],
     'normalize': ['mfcc', 'pitch', 'f0', 'energy'],
-    'mode': 'tri',
+    'mode': 'bin',
     'context': 30,
     'hop': 10,
-    'seq': True,
+    'seq': False,
 }

@@ -2,13 +2,15 @@ from __future__ import print_function, division, absolute_import
 
 import os
 
-CUT_DURATION = 10
+CUT_DURATION = 20
 
 inpath = [
     "/mnt/sdb1/digisami_data/estonian",
     "/mnt/sdb1/digisami_data/finnish",
     "/mnt/sdb1/digisami_data/sami_conv"
 ]
+
+rawpath = "/mnt/sdb1/digisami_data/raw"
 
 outpath = "/home/trung/data/sami_feat"
 if not os.path.exists(outpath):
