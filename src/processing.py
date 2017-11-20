@@ -7,11 +7,12 @@ from six.moves import cPickle
 import numpy as np
 from scipy import stats
 from odin.utils import (flatten_list, cache_disk, one_hot,
-                        as_list, ctext, UnitTimer, Progbar)
+                        as_list, ctext, UnitTimer, Progbar,
+                        cpu_count)
 from odin import fuel as F
 from odin.stats import train_valid_test_split, freqcount
 
-from const import outpath
+from const import featpath
 from topic_clustering import train_topic_clusters
 
 
@@ -22,11 +23,9 @@ ALL_LAUGH = [
     'fl, b', 'fl, e', 'fl, m', 'fl, o', 'fl, p',
     'st, b', 'st, e', 'st, m', 'st, o', 'st, p'
 ]
-_INSPECT_MODE = False
-
 # extract all text once for all
-ds = F.Dataset(outpath, read_only=True)
-with open(os.path.join(ds.path, 'topic'), 'r') as f:
+ds = F.Dataset(featpath, read_only=True)
+with open(os.path.join(ds.path, 'topic'), 'rb') as f:
     _ = cPickle.load(f)
     _ALL_TEXT = [j[-1] for i in _.values() for j in i]
 print(ctext("Total amount of transcription:", 'red'), len(_ALL_TEXT))
@@ -45,11 +44,6 @@ def get_nb_classes(mode):
     else:
         raise ValueError(str(mode))
     return n
-
-
-def set_inspect_mode(mode):
-    global _INSPECT_MODE
-    _INSPECT_MODE = mode
 
 
 # ===========================================================================
@@ -73,62 +67,42 @@ class LaughTrans(F.recipes.FeederRecipe):
         self.mode = mode
         self.nb_classes = get_nb_classes(mode)
 
-    def process(self, name, X, y):
-        orig_name = str(name)
-        name, start, end = name.split(':')
+    def process(self, name, X):
         lang = name.split('/')[0]
-        start = float(start)
-        end = float(end)
-        unit = (end - start) / X[0].shape[0]
-        start = int(np.floor(start / unit))
-        end = int(np.floor(end / unit))
         laugh = self.laugh[name]
         gender = self.gender[lang]
         # ====== create labels ====== #
-        labels = np.zeros(shape=(X[0].shape[0],), dtype='float32')
-        genfeat = np.zeros(shape=(X[0].shape[0],), dtype='float32')
-        for spkID, s, e, anno in laugh:
-            if ('fl,' in anno or 'st,' in anno) and\
-            (s <= end and start <= e) and\
-            anno in ALL_LAUGH:
-                overlap_start = max(start, s) - start
-                overlap_length = min(e, end) - max(s, start)
+        laugh_feat = np.zeros(shape=(X[0].shape[0],), dtype='float32')
+        gen_feat = np.zeros(shape=(X[0].shape[0],), dtype='float32')
+        for s, e, anno, spkID in laugh:
+            if anno in ALL_LAUGH:
                 # laugh annotation
                 if self.mode == 'bin':
                     lau = 1
                 elif self.mode == 'tri':
                     lau = LAUGH.index(anno.split(',')[0])
                 elif self.mode == 'all':
-                    if anno in ALL_LAUGH:
-                        lau = ALL_LAUGH.index(anno)
+                    lau = ALL_LAUGH.index(anno)
                 else:
                     raise RuntimeError("Unknown `mode`='%s'" % self.mode)
-                labels[overlap_start:overlap_start + overlap_length] = lau
+                laugh_feat[s:e] = lau
                 # gender features
                 gen = GENDER.index(gender[spkID])
-                genfeat[overlap_start:overlap_start + overlap_length] = gen
+                gen_feat[s:e] = gen
         # ====== add new labels and features ====== #
-        if not _INSPECT_MODE:
-            X = [np.concatenate([np.expand_dims(x, -1) if x.ndim == 1 else x
-                                 for x in X], axis=-1),
-                 np.expand_dims(genfeat, axis=-1)]
-            y.append(one_hot(labels, self.nb_classes))
-        else:
-            X.append(genfeat)
-            y.append(labels)
-        return orig_name, X, y
+        X.append(one_hot(gen_feat, nb_classes=len(GENDER)))
+        X.append(one_hot(laugh_feat, nb_classes=self.nb_classes))
+        return name, X
 
     def shape_transform(self, shapes):
-        n = shapes[0][0][0]
-        ids = shapes[0][1]
-        # append gender features
-        if _INSPECT_MODE:
-            shapes.append(
-                ((n,), list(ids)))
-        else:
-            shapes = [(n, sum(1 if len(shp) == 1 else shp[-1]
-                              for shp, ids in shapes), list(ids)),
-                      ((n, 1), list(ids))]
+        ref_shp, ref_ids = shapes[0]
+        n = ref_shp[0]
+        # Gender
+        shapes.append(
+            ((n, len(GENDER)), list(ref_ids)))
+        # laugh
+        shapes.append(
+            ((n, self.nb_classes), list(ref_ids)))
         return shapes
 
 
@@ -146,36 +120,20 @@ class TopicTrans(F.recipes.FeederRecipe):
         self.model = train_topic_clusters(text, nb_topics=nb_topics,
                                           print_log=True)
 
-    def process(self, name, X, y):
-        orig_name = name
-        name, start, end = name.split(':')
-        lang = name.split('/')[0]
-        start = float(start)
-        end = float(end)
-        unit = (end - start) / X[0].shape[0]
-        start = int(np.floor(start / unit))
-        end = int(np.floor(end / unit))
-        # ====== read topic for differnt dataset ====== #
-        if lang in ('est', 'fin'):
-            topic = self.topic[name]
-        else:
-            short_name = '_'.join(name.split('_')[:-1])
-            topic = self.topic[short_name]
+    def process(self, name, X):
+        topic = self.topic[name]
         # ====== topic labels ====== #
-        labels = np.full(shape=(X[0].shape[0], 1),
+        labels = np.full(shape=(X[0].shape[0],),
                          fill_value=self.nb_topics,
                          dtype='float32')
         for s, e, anno in topic:
-            if s <= end and start <= e:
-                # get info
-                topicID = self.model[anno]
-                # set info
-                overlap_start = max(start, s) - start
-                overlap_length = min(e, end) - max(s, start)
-                labels[overlap_start:overlap_start + overlap_length] = topicID
+            # get info
+            topicID = self.model[anno]
+            # set info
+            labels[s:e] = topicID
         # ====== add new features ====== #
-        X.append(labels.ravel() if _INSPECT_MODE else labels)
-        return orig_name, X, y
+        X.append(one_hot(labels, self.nb_topics + 1))
+        return name, X
 
     def shape_transform(self, shapes):
         """
@@ -186,10 +144,10 @@ class TopicTrans(F.recipes.FeederRecipe):
         indices: dict
             {name: nb_samples}
         """
-        n = shapes[0][0][0]
-        ids = shapes[0][1]
+        ref_shp, ref_ids = shapes[0]
+        n = ref_shp[0]
         shapes.append(
-            ((n,), list(ids)))
+            ((n, self.nb_topics + 1), list(ref_ids)))
         return shapes
 
 
@@ -197,12 +155,12 @@ class TopicTrans(F.recipes.FeederRecipe):
 # Main
 # ===========================================================================
 def get_dataset(dsname=['est'],
-                feats=['mspec', 'pitch', 'vad'],
-                normalize=['mspec'],
+                feats=['mspec', 'pitch', 'sap'],
                 mode='bin',
-                context=30, hop=1, seq=True,
+                context=30, step=1, seq=True,
                 nb_topics=6, unite_topics=False,
-                ncpu=4, seed=12082518):
+                ncpu=None, seed=12082518,
+                return_single_data=False):
     """
     dsname: str (est, fin, sam)
     feats: list of str
@@ -212,8 +170,11 @@ def get_dataset(dsname=['est'],
         'bin'- binary laugh and non-laugh
         'tri' - speech laugh
         'all' - all type of laugh
-    unite_topics: bool, if True, train 1 topic clustering model for all
-    dataset
+    unite_topics: bool,
+        if True, train 1 topic clustering model for all dataset
+    return_single_data: bool
+        if True, don't split train, valid, test and return single
+        Feeder of all utterances
 
     Features
     --------
@@ -229,136 +190,95 @@ def get_dataset(dsname=['est'],
     ----
     Order of the features:
         * all_original_features_concatenated (n, ...)
-        * Gender features (n, 1)
         * Topic features (n, 1)
+        * Gender features (n, 1)
+        * Laugh features (n, 1)
     """
     # ====== prepare arguments ====== #
     np.random.seed(seed)
     dsname = as_list(dsname, t=str)
     feats = [s.lower() for s in as_list(feats, t=str)]
-    normalize = as_list(normalize, t=str)
     mode = str(mode)
-    ds = F.Dataset(outpath, read_only=True)
+    ds = F.Dataset(featpath, read_only=True)
     context = int(context)
-    hop = int(hop)
+    step = int(step)
+    if ncpu is None:
+        ncpu = cpu_count() - 1
+    nb_classes = get_nb_classes(mode)
+    print(ctext("#Classes:", 'cyan'), nb_classes)
     # ====== annotations ====== #
-    with open(os.path.join(ds.path, 'laugh'), 'r') as f:
+    with open(os.path.join(ds.path, 'laugh'), 'rb') as f:
         laugh = cPickle.load(f)
-    with open(os.path.join(ds.path, 'topic'), 'r') as f:
+    with open(os.path.join(ds.path, 'topic'), 'rb') as f:
         topic = cPickle.load(f)
-    with open(os.path.join(ds.path, 'gender'), 'r') as f:
+    with open(os.path.join(ds.path, 'gender'), 'rb') as f:
         gender = cPickle.load(f)
     # ====== get the indices of given languages ====== #
     indices = [(name, start, end)
-               for name, (start, end) in ds['indices'].iteritems()
+               for name, (start, end) in ds['indices'].items()
                if any(i + '/' in name for i in dsname)]
     print(ctext("#Utterances:", 'cyan'), len(indices))
-    # ====== get length ====== #
-    length = defaultdict(lambda: [0, 0])
-    for name, n1, n2 in indices:
-        name, start, end = name.split(':')
-        # first value is length in second
-        length[name][0] = max(length[name][0], float(end))
-        # second value is number of frames
-        length[name][1] += n2 - n1
-        # sepcial case for sami
-        if 'sam/' == name[:4]:
-            short_name = '_'.join(name.split('_')[:-1])
-            length[short_name] = length[name]
-    # length is second per frame
-    length = {name: duration / n
-              for name, (duration, n) in length.iteritems()}
-    # convert laugh and topic to index
-    laugh = {name: [(spk, int(np.floor(s / length[name])),
-                     int(np.ceil(e / length[name])), l)
-                    for spk, s, e, l in anno]
-             for name, anno in laugh.iteritems()
-             if name in length}
-    topic = {name: [(int(np.floor(s / length[name])),
-                     int(np.ceil(e / length[name])), tp)
-                    for s, e, tp in alltopic]
-             for name, alltopic in topic.iteritems()
-             if name in length}
-    print(ctext("#Audio Files:", 'cyan'), len(length), len(laugh), len(topic))
+    print(ctext("#Laugh:", 'cyan'), len(laugh))
+    print(ctext("#Topic:", 'cyan'), len(topic))
     # ====== get all types of data ====== #
     data = [ds[i] for i in feats]
-    # ====== INPSECTATION MODE ====== #
-    if _INSPECT_MODE:
-        feeder = F.Feeder(F.DataDescriptor(data=data, indices=indices),
-                          dtype='float32', batch_mode='file',
-                          ncpu=ncpu, buffer_size=1)
-        feeder.set_recipes([
-            # [F.recipes.Normalization(mean=ds[i + '_mean'],
-            #                          std=ds[i + '_std'],
-            #                          local_normalize=None,
-            #                          data_idx=feats.index(i))
-            #  for i in normalize if i + '_mean' in ds],
-            # Laugh annotation and gender feature
-            LaughTrans(laugh, gender=gender, mode=mode),
-            # Adding topic features
-            TopicTrans(topic, nb_topics=nb_topics,
-                       unite_topics=unite_topics),
-        ])
-        feeder.set_batch(batch_size=2056, seed=None, shuffle_level=0)
-        return feeder
-    # ====== split train test ====== #
-    train, valid, test = train_valid_test_split(indices,
-        cluster_func=lambda x: x[0].split('/')[0],
-        idfunc=lambda x: x[0].split('/')[1].split(':')[0],
-        train=0.6, inc_test=True, seed=np.random.randint(10e8))
-    assert len(train) + len(test) + len(valid) == len(indices)
-    print(ctext("#Train Utterances:", 'cyan'), len(train),
-          freqcount(train, key=lambda x: x[0].split('/')[0]))
-    print(ctext("#Valid Utterances:", 'cyan'), len(valid),
-          freqcount(valid, key=lambda x: x[0].split('/')[0]))
-    print(ctext("#Test Utterances:", 'cyan'), len(test),
-         freqcount(test, key=lambda x: x[0].split('/')[0]))
-    # ====== create feeder and recipes ====== #
-    train = F.Feeder(F.DataDescriptor(data=data, indices=train),
-                     dtype='float32', batch_mode='batch',
-                     ncpu=ncpu, buffer_size=12)
-    valid = F.Feeder(F.DataDescriptor(data=data, indices=valid),
-                     dtype='float32', batch_mode='batch',
-                     ncpu=ncpu, buffer_size=4)
-    test = F.Feeder(F.DataDescriptor(data=data, indices=test),
-                    dtype='float32', batch_mode='file',
-                    ncpu=2, buffer_size=1)
     # ====== recipes ====== #
     recipes = [
-        [F.recipes.Normalization(mean=ds[i + '_mean'],
-                                 std=ds[i + '_std'],
-                                 local_normalize=None,
-                                 data_idx=feats.index(i))
-         for i in normalize if i + '_mean' in ds],
-        # Laugh annotation and gender feature
-        LaughTrans(laugh, gender=gender, mode=mode),
         # Adding topic features
         TopicTrans(topic, nb_topics=nb_topics, unite_topics=unite_topics),
+        # Laugh annotation and gender feature
+        LaughTrans(laugh, gender=gender, mode=mode),
         # Sequencing of Stacking
         F.recipes.Sequencing(frame_length=context,
-                             hop_length=hop,
-                             end='pad', endvalue=0.,
-                             endmode='post') if seq else
+                             step_length=step, end='cut',
+                             label_mode='last') if seq else
         F.recipes.Stacking(left_context=context // 2,
                            right_context=context // 2,
-                           shift=hop)
+                           shift=step)
     ]
-    train.set_recipes(recipes)
-    valid.set_recipes(recipes)
-    test.set_recipes(recipes).set_batch(batch_size=256, seed=None)
-    nb_classes = get_nb_classes(mode)
-    print(ctext("Train shape:", 'cyan'), train.shape)
-    print(ctext("Valid shape:", 'cyan'), valid.shape)
-    print(ctext("Test shape:", 'cyan'), test.shape)
-    print(ctext("#Classes:", 'cyan'), nb_classes)
+    # ====== split train test ====== #
+    if not return_single_data:
+        train, valid, test = train_valid_test_split(indices,
+            # stratified split by language cluster
+            cluster_func=lambda x: x[0].split('/')[0],
+            # split by utterances
+            idfunc=lambda x: x[0].split('/')[1].split('.')[0],
+            train=0.6, inc_test=True, seed=np.random.randint(10e8))
+        assert len(train) + len(test) + len(valid) == len(indices)
+        print(ctext("#Train Utterances:", 'cyan'), len(train),
+              freqcount(train, key=lambda x: x[0].split('/')[0]))
+        print(ctext("#Valid Utterances:", 'cyan'), len(valid),
+              freqcount(valid, key=lambda x: x[0].split('/')[0]))
+        print(ctext("#Test Utterances:", 'cyan'), len(test),
+             freqcount(test, key=lambda x: x[0].split('/')[0]))
+        # ====== create feeder and recipes ====== #
+        train = F.Feeder(F.DataDescriptor(data=data, indices=train),
+                         batch_mode='batch', ncpu=ncpu, buffer_size=18)
+        valid = F.Feeder(F.DataDescriptor(data=data, indices=valid),
+                         batch_mode='batch', ncpu=max(1, ncpu // 2), buffer_size=4)
+        test = F.Feeder(F.DataDescriptor(data=data, indices=test),
+                        batch_mode='file', ncpu=ncpu, buffer_size=1)
+        train.set_recipes(recipes)
+        valid.set_recipes(recipes)
+        test.set_recipes(recipes).set_batch(batch_size=256, seed=None)
+        print(ctext("Train shape:", 'cyan'), train.shape)
+        print(ctext("Valid shape:", 'cyan'), valid.shape)
+        print(ctext("Test shape:", 'cyan'), test.shape)
+    else:
+        train = F.Feeder(F.DataDescriptor(data=data, indices=indices),
+                         batch_mode='batch', ncpu=ncpu, buffer_size=18)
+        train.set_recipes(recipes)
+    print(train)
     # ====== some test ====== #
-    # for X in Progbar(target=train,
-    #                  print_report=True, print_summary=True
-    #                  ).set_iter_info(lambda x: x[0].shape[0],
-    #                                  lambda x: [('X', x[0].shape),
-    #                                             ('Gen', x[1].shape),
-    #                                             ('Topic', x[2].shape),
-    #                                             ('y', x[3].shape)]):
-    #     pass
+    # prog = Progbar(target=len(train), print_summary=True, print_report=True)
+    # for x in train:
+    #     prog['Data'] = str([i.shape for i in x])
+    #     prog.add(x[0].shape[0])
     # ====== estimate nb_classes ====== #
+    if return_single_data:
+        return train, nb_classes
     return train, valid, test, nb_classes
+
+
+def get_pca(feat_name):
+    pass

@@ -22,6 +22,7 @@ from nltk.stem import PorterStemmer, WordNetLemmatizer
 # Constants
 # ===========================================================================
 embedder = F.load_glove(ndim=100)
+print("Loaded Embedding:", str(embedder))
 _replace_pat = [
     re.compile('\[\.*\]'), # [...]
     re.compile('\(.*\)'), # (laugh)
@@ -36,7 +37,7 @@ _replace_pat = [
 def preprocess_text(text):
     for r in _replace_pat:
         text = r.sub('', text)
-    return text.decode('utf8')
+    return text
 
 
 def get_wordnet_pos(treebank_tag):
@@ -100,7 +101,7 @@ def _create_model(text, keep_stopword=True, keep_oov=True, keep_punct=False,
                                  min_df=2, stop_words=None)
     tk_vec = vectorizer.fit_transform([' '.join(i) for i in text])
     terms = vectorizer.get_feature_names()
-    lda = LatentDirichletAllocation(n_topics=nb_topics,
+    lda = LatentDirichletAllocation(n_components=nb_topics,
                                    max_iter=8,
                                    learning_method='online',
                                    batch_size=len(text),
