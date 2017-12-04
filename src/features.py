@@ -5,6 +5,8 @@ matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 
 import os
+os.environ['ODIN'] = 'float32,thread=1,cpu=1,gpu=1'
+
 import wave
 import shutil
 import numpy as np
@@ -14,7 +16,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from odin import fuel as F, visual as V
+from odin import fuel as F, visual as V, nnet as N
 from odin.utils import get_all_files, ctext
 from odin import preprocessing as pp
 from const import (inpath, featpath, segpath,
@@ -195,36 +197,42 @@ sami_factor = {
 }
 duration = {name: (d / sami_factor[name]) if name in sami_factor else d
             for name, d in duration.items()}
-input(ctext("Do you want to continue?", 'red'))
+input(ctext("Do you want to delete old features?", 'red'))
 # ===========================================================================
 # Processing
 # ===========================================================================
 DEBUG = False
+dbf_network = N.models.BNF_2048_MFCC39()
 # ====== FEAT ====== #
 pipeline = pp.make_pipeline(steps=[
     pp.speech.AudioReader(remove_dc_n_dither=True, preemphasis=0.97),
     pp.base.NameConverter(converter=segments_new, keys='path'),
     pp.speech.SpectraExtractor(frame_length=FRAME_LENGTH,
                                step_length=STEP_LENGTH,
-                               nfft=512, nmels=40, nceps=24,
-                               fmax=4000),
-    pp.speech.RASTAfilter(rasta=True, sdc=0),
+                               nfft=512, nmels=40, nceps=13,
+                               fmin=100, fmax=4000),
+    pp.base.DuplicateFeatures(name='mfcc', new_name='mfcc1'),
+    pp.speech.RASTAfilter(rasta=True, sdc=0, feat_name='mfcc1'),
     pp.speech.openSMILEpitch(frame_length=0.06, step_length=STEP_LENGTH,
                              loudness=True, voiceProb=True, method='shs'),
     pp.base.DeltaExtractor(width=9, order=(0, 1, 2),
-                           feat_type=('mspec', 'mfcc', 'pitch',
+                           feat_type=('mspec', 'mfcc', 'pitch', 'mfcc1',
                                       'loudness', 'energy')),
-    pp.speech.AcousticNorm(feat_type=('mspec', 'spec', 'mfcc',
-                                      'energy')),
+    pp.speech.DBFExtractor(input_feat='mfcc', network=dbf_network,
+                           context=10, mvn=True),
+    pp.speech.AcousticNorm(feat_type=('mspec', 'spec', 'mfcc', 'mfcc1',
+                                      'dbf', 'energy')),
     pp.base.RemoveFeatures(feat_type=('raw')),
-    pp.base.EqualizeShape0(feat_type=('spec', 'mspec', 'mfcc', 'energy',
-                                      'pitch', 'loudness', 'sap')),
+    pp.base.EqualizeShape0(feat_type=('spec', 'mspec', 'mfcc', 'energy', 'pitch',
+                                      'loudness', 'sap', 'mfcc1', 'dbf')),
     pp.base.AsType(type_map={'spec': 'float32', 'mspec': 'float32',
-                             'mfcc': 'float32', 'energy': 'float32',
-                             'pitch': 'float32', 'loudness': 'float32',
-                             'sap': 'float32'})
+                             'mfcc': 'float32', 'mfcc1': 'float32',
+                             'energy': 'float32', 'pitch': 'float32',
+                             'loudness': 'float32', 'sap': 'float32',
+                             'dbf': 'float32'})
 ],
 debug=DEBUG)
+# ====== RUn ====== #
 if DEBUG:
     f = list(segments_new.keys())[0]
     V.plot_features(pipeline.transform(f))
@@ -234,7 +242,7 @@ else:
                                extractor=pipeline, path=featpath,
                                ncache=180, ncpu=None, override=True)
     feat.run()
-    pp.calculate_pca(feat, feat_name=('mspec', 'mfcc', 'spec',
+    pp.calculate_pca(feat, feat_name=('mspec', 'mfcc', 'spec', 'dbf', 'mfcc1',
                                       'pitch', 'energy', 'loudness'),
                      override=True)
     pp.validate_features(feat, '/tmp/digisami_feat',
