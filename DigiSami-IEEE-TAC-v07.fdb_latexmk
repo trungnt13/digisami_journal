@@ -1,13 +1,13 @@
 # Fdb version 3
-["bibtex DigiSami-IEEE-TAC-v07"] 1511192398 "DigiSami-IEEE-TAC-v07.aux" "DigiSami-IEEE-TAC-v07.bbl" "DigiSami-IEEE-TAC-v07" 1511192400
+["bibtex DigiSami-IEEE-TAC-v07"] 1511192398 "DigiSami-IEEE-TAC-v07.aux" "DigiSami-IEEE-TAC-v07.bbl" "DigiSami-IEEE-TAC-v07" 1512397890
   "../digisami.bib" 0 -1 0 ""
   "/usr/local/texlive/2015/texmf-dist/bibtex/bst/IEEEtran/IEEEtran.bst" 1222816716 59506 016987d9be15acf51cdd7252d40ecec2 ""
-  "DigiSami-IEEE-TAC-v07.aux" 1511192399 10976 0c49c2ea60908fdf214dc37b71ba12b0 ""
+  "DigiSami-IEEE-TAC-v07.aux" 1512397441 10976 0c49c2ea60908fdf214dc37b71ba12b0 ""
   "DigiSami-IEEE-TAC-v07.bcf" 0 -1 0 ""
   (generated)
-  "DigiSami-IEEE-TAC-v07.bbl"
   "DigiSami-IEEE-TAC-v07.blg"
-["pdflatex"] 1511192398 "DigiSami-IEEE-TAC-v07.tex" "DigiSami-IEEE-TAC-v07.pdf" "DigiSami-IEEE-TAC-v07" 1511192400
+  "DigiSami-IEEE-TAC-v07.bbl"
+["pdflatex"] 1512397440 "DigiSami-IEEE-TAC-v07.tex" "DigiSami-IEEE-TAC-v07.pdf" "DigiSami-IEEE-TAC-v07" 1512397890
   "./figures/emotion_dist.pdf" 1511175983 163984 ea548eee515d4bb70df2925f0dd4233f ""
   "./figures/laugh_dist.pdf" 1511172448 155382 d8605ab73fb3bf17ee09f0992714d073 ""
   "./figures/lda_topic_clustering.pdf" 1499342909 519922 85db6857606a62c2be5547be4dd78080 ""
@@ -131,9 +131,9 @@
   "/usr/local/texlive/2015/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1432479641 1764542 91654ba72bdb667e84ea24f076ae16d8 ""
   "/usr/local/texlive/2015/texmf-var/web2c/pdftex/pdflatex.fmt" 1441886556 3849859 52369726a2370e1091e27122d8c72c85 ""
   "/usr/local/texlive/2015/texmf.cnf" 1432479636 577 0d611272082f3cdb8e80e09a3c69cf07 ""
-  "DigiSami-IEEE-TAC-v07.aux" 1511192399 10976 0c49c2ea60908fdf214dc37b71ba12b0 ""
+  "DigiSami-IEEE-TAC-v07.aux" 1512397441 10976 0c49c2ea60908fdf214dc37b71ba12b0 ""
   "DigiSami-IEEE-TAC-v07.bbl" 1470073766 5992 dd4cc8053567a84efc475a551fa38765 "bibtex DigiSami-IEEE-TAC-v07"
-  "DigiSami-IEEE-TAC-v07.tex" 1511192395 77280 1524e5146073e3a141ab863c61d1c8a3 ""
+  "DigiSami-IEEE-TAC-v07.tex" 1512397889 77280 1524e5146073e3a141ab863c61d1c8a3 ""
   "IEEEtran.cls" 1440650876 288304 b67b6fc6c2abb39f9b461923f5199343 ""
   "figures/emotion_dist.pdf" 1511175983 163984 ea548eee515d4bb70df2925f0dd4233f ""
   "figures/laugh_dist.pdf" 1511172448 155382 d8605ab73fb3bf17ee09f0992714d073 ""
@@ -155,7 +155,7 @@
   "images/PCA-MFCC-EE.png" 1470065152 315895 dab148abae4ad053aa39d76fd8e61a6d ""
   "images/boundingbox.png" 1493111792 162780 02f441452d3ae57ebc9cbaff96f5dff5 ""
   (generated)
+  "DigiSami-IEEE-TAC-v07.log"
+  "sections/3_copora_desc.tex.aux"
   "DigiSami-IEEE-TAC-v07.aux"
   "DigiSami-IEEE-TAC-v07.pdf"
-  "sections/3_copora_desc.tex.aux"
-  "DigiSami-IEEE-TAC-v07.log"

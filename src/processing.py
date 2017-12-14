@@ -178,6 +178,7 @@ def get_dataset(dsname=['est'],
 
     Features
     --------
+        * dbf
         * spec
         * mspec
         * mfcc
@@ -223,18 +224,22 @@ def get_dataset(dsname=['est'],
     # ====== get all types of data ====== #
     data = [ds[i] for i in feats]
     # ====== recipes ====== #
+    if context > 1:
+        # Sequencing of Stacking
+        post_processing = F.recipes.Sequencing(frame_length=context,
+                             step_length=step, end='cut',
+                             label_mode='last') if seq else \
+            F.recipes.Stacking(left_context=context // 2,
+                               right_context=context // 2,
+                               shift=step)
+    else:
+        post_processing = None
     recipes = [
         # Adding topic features
         TopicTrans(topic, nb_topics=nb_topics, unite_topics=unite_topics),
         # Laugh annotation and gender feature
         LaughTrans(laugh, gender=gender, mode=mode),
-        # Sequencing of Stacking
-        F.recipes.Sequencing(frame_length=context,
-                             step_length=step, end='cut',
-                             label_mode='last') if seq else
-        F.recipes.Stacking(left_context=context // 2,
-                           right_context=context // 2,
-                           shift=step)
+        post_processing
     ]
     # ====== split train test ====== #
     if not return_single_data:

@@ -36,41 +36,65 @@ from processing import (get_dataset, GENDER, ALL_LAUGH)
 
 save_path = '/tmp/tmp.pdf'
 all_ltype = [i for i in ALL_LAUGH if i is not None]
+laugh_colors = {laugh: color
+                for laugh, color in zip(all_ltype,
+                    V.generate_random_colors(n=len(all_ltype)))}
+all_feats = ['dbf', 'spec', 'mspec', 'mfcc',
+             'energy', 'pitch', 'f0']
 popular_ltype = ['fl, b', 'fl, e', 'fl, m',
                  'st, b', 'st, e', 'st, m']
 
 
 def timeFMT(dur):
-    min = int(dur)
-    frac = dur - min
-    if frac > 0:
-        frac = int(frac * 60)
-        return str(min) + ':%.02d' % frac
-    else:
-        return str(min) + ':00'
+  min = int(dur)
+  frac = dur - min
+  if frac > 0:
+    frac = int(frac * 60)
+    return str(min) + ':%.02d' % frac
+  else:
+    return str(min) + ':00'
 
 
 # ===========================================================================
 # Helper
 # ===========================================================================
 def alias2name(lang):
-    return 'Sami' if lang == 'sam' else \
-        ('Finnish' if lang == 'fin' else 'Estonian')
+  return 'Sami' if lang == 'sam' else \
+      ('Finnish' if lang == 'fin' else 'Estonian')
+
+
+def transform1(name, X, start, end):
+  if name in ('mspec', 'mfcc', 'f0', 'pitch', 'energy'):
+    n = X.shape[1]
+    X = X[:, :n // 3]
+  X = X[int(start):int(end)]
+  return X
 
 # ===========================================================================
 # Const
 # ===========================================================================
+# laugh, gender, utt_duration
 ds = F.Dataset(featpath, read_only=True)
-with open(os.path.join(ds.path, 'laugh'), 'rb') as f:
-    laugh = cPickle.load(f)
-with open(os.path.join(ds.path, 'gender'), 'rb') as f:
-    gender = cPickle.load(f)
-with open(os.path.join(ds.path, 'utt_duration'), 'rb') as f:
-    utt_duration = cPickle.load(f)
+all_files = sorted(list(ds['indices'].keys()))
 # ====== get length ====== #
-data, nb_classes = get_dataset(dsname=['est', 'fin', 'sam'],
-                               feats=['spec', 'mspec', 'mfcc',
-                                     'energy', 'pitch', 'sap'],
-                               mode='all', ncpu=None,
-                               return_single_data=True)
-data.set_batch(batch_size=512, batch_mode='file', seed=None)
+# data, nb_classes = get_dataset(dsname=['est', 'fin', 'sam'],
+#                                feats=all_feats,
+#                                context=1, step=1,
+#                                mode='all', ncpu=None,
+#                                return_single_data=True)
+# data.set_batch(batch_size=512, batch_mode='file', seed=None)
+
+# ====== fast check the dataset ====== #
+f = all_files[12]
+start, end = ds['indices'][f]
+n = end - start
+laugh = np.ones(shape=(n, n // 8), dtype='float32')
+for s, e, lt, spk in ds['laugh'][f]:
+  if lt in all_ltype:
+    laugh[s:e, :] = 0.
+feat = {name: transform1(name, ds[name][start:end], 200, 800)
+        for name in all_feats}
+feat['Laughter'] = laugh[200:800]
+
+V.plot_features(feat)
+V.plot_save('/tmp/tmp.pdf')
