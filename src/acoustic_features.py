@@ -26,6 +26,7 @@ from odin.utils import get_all_files, ctext
 from odin import preprocessing as pp
 from const import (inpath, featpath, segpath, SR,
                    CUT_DURATION, FRAME_LENGTH, STEP_LENGTH,
+                   FMIN, FMAX,
                    utt_id)
 # ===========================================================================
 # Helper
@@ -204,8 +205,8 @@ duration = {name: (d / sami_factor[name])
 # ===========================================================================
 DEBUG = args.debug
 bnf_network = N.models.BNF_2048_MFCC39()
-delta_delta_feat = ('mfcc', 'mspec', 'pitch', 'f0',
-                    'energy', 'loudness', 'sap')
+delta_delta_feat = ('mfcc', 'mspec', 'pitch',
+                    'f0', 'loudness', 'energy', 'sap')
 # ====== FEAT ====== #
 pipeline = pp.make_pipeline(steps=[
     pp.speech.AudioReader(remove_dc_n_dither=True, preemphasis=0.97),
@@ -213,16 +214,19 @@ pipeline = pp.make_pipeline(steps=[
     pp.speech.SpectraExtractor(frame_length=FRAME_LENGTH,
                                step_length=STEP_LENGTH,
                                nfft=512, nmels=40, nceps=13,
-                               fmin=100, fmax=SR // 2),
+                               fmin=FMIN, fmax=FMAX),
     pp.speech.SADextractor(nb_mixture=3, nb_train_it=25,
                            smooth_window=8, feat_name='energy'),
     # 'f0', 'pitch'
     pp.speech.openSMILEpitch(frame_length=0.03, step_length=STEP_LENGTH,
-                             fmin=24, fmax=800, voicingCutoff_pitch=0.51,
-                             f0min=64, f0max=420, n_candidates=15,
-                             voicingCutoff_f0=0.4,
-                             f0=True, loudness=True, voiceProb=True,
+                             fmin=24, fmax=600, voicingCutoff_pitch=0.7,
+                             f0min=64, f0max=420, voicingCutoff_f0=0.55,
+                             f0=True, loudness=False, voiceProb=True,
                              method='acf'),
+    pp.speech.openSMILEloudness(frame_length=FRAME_LENGTH,
+                                step_length=STEP_LENGTH,
+                                nmel=40, fmin=20, fmax=None,
+                                to_intensity=False),
     # ====== bottleneck ====== #
     pp.base.DuplicateFeatures(name='mfcc', new_name='mfcc1'),
     pp.base.DeltaExtractor(width=9, order=(0, 1, 2), feat_name='mfcc1'),
@@ -233,7 +237,8 @@ pipeline = pp.make_pipeline(steps=[
     pp.speech.RASTAfilter(rasta=True, sdc=0, feat_name='mfcc'),
     pp.base.DeltaExtractor(width=9, order=(0, 1, 2), feat_name=delta_delta_feat),
     pp.speech.AcousticNorm(mean_var_norm=True, windowed_mean_var_norm=False,
-                           feat_name=('mspec', 'spec', 'mfcc', 'bnf', 'energy')),
+                           feat_name=('mspec', 'spec', 'mfcc', 'bnf')),
+    # ====== post processing ====== #
     pp.base.EqualizeShape0(feat_name=('spec', 'mspec', 'mfcc', 'energy',
                                       'pitch', 'f0', 'loudness', 'sap',
                                       'bnf', 'sad')),
@@ -276,9 +281,6 @@ else:
                              extractor=pipeline, path=featpath,
                              ncache=180, ncpu=None, override=True)
   feat.run()
-  pp.calculate_pca(feat, feat_name=('mspec', 'mfcc', 'spec', 'bnf',
-                                    'pitch', 'f0', 'energy', 'loudness'),
-                   override=True)
   pp.validate_features(feat, '/tmp/digisami_feat',
                        nb_samples=12, override=True)
   # ====== save ====== #
@@ -294,3 +296,8 @@ else:
   ds = F.Dataset(featpath, read_only=True)
   print(ds)
   ds.close()
+  # ====== calculate pca ====== #
+  pp.calculate_pca(featpath,
+                   feat_name=('mspec', 'mfcc', 'spec', 'bnf',
+                              'pitch', 'f0', 'energy', 'loudness'),
+                   override=True)
